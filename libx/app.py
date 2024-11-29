@@ -1,11 +1,22 @@
 import os
 import sys
 import logging
+from urllib.parse import urlparse
+from io import BytesIO
 from spotipy import Spotify
 from spotipy.oauth2 import SpotifyOAuth
 from dotenv import load_dotenv
 import boto3
-from flask import Flask, request, redirect, session, jsonify
+from flask import (
+    Flask,
+    request,
+    redirect,
+    session,
+    send_file,
+    Response,
+    send_from_directory,
+)
+from http import HTTPStatus
 from flask_cors import CORS, cross_origin
 from flask_session import Session
 from typing import *
@@ -22,77 +33,128 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(sys.stdout)],
 )
 
-
 logger = logging.getLogger(__name__)
+
+
+def extract_domain(url: str) -> str:
+    parsed = urlparse(url)
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+
+# Spotify config
 spotify_client_id = os.environ["SPOTIFY_CLIENT_ID"]
 spotify_client_secret = os.environ["SPOTIFY_CLIENT_SECRET"]
-redirect_uri = os.environ["SPOTIFY_REDIRECT_URI"]
-scope = [
+spotify_redirect_uri = os.environ["SPOTIFY_REDIRECT_URI"]
+spotify_scope = [
     "playlist-read-private",
     "user-library-read",
 ]
-bucket_name = os.environ["R2_BUCKET_NAME"]
-endpoint_url = os.environ["R2_ENDPOINT_URL"]
-access_key_id = os.environ["R2_ACCESS_KEY_ID"]
-secret_access_key = os.environ["R2_SECRET_ACCESS_KEY"]
 
+# Cloudfare R2 config
+r2_bucket_name = os.environ["R2_BUCKET_NAME"]
+r2_access_key_id = os.environ["R2_ACCESS_KEY_ID"]
+r2_account_id = os.environ["R2_ACCOUNT_ID"]
+r2_secret_access_key = os.environ["R2_SECRET_ACCESS_KEY"]
+r2_endpoint_url = f"https://{r2_account_id}.r2.cloudflarestorage.com"
+r2_operation_timeout = 3600
 
-app = Flask(__name__)
+domain = extract_domain(spotify_redirect_uri)
+index_file = "index.html"
+dist_folder = "../www/libx/dist"
+
+app = Flask(__name__, static_folder=dist_folder, static_url_path="")
 app.secret_key = os.urandom(32)
+port = 8000
 
 spotify = SpotifyOAuth(
     client_id=spotify_client_id,
     client_secret=spotify_client_secret,
-    redirect_uri=redirect_uri,
-    scope=scope,
+    redirect_uri=spotify_redirect_uri,
+    scope=spotify_scope,
 )
 
-s3 = boto3.client(
+boto = boto3.client(
     "s3",
-    endpoint_url=endpoint_url,
-    aws_access_key_id=access_key_id,
-    aws_secret_access_key=secret_access_key,
+    endpoint_url=r2_endpoint_url,
+    aws_access_key_id=r2_access_key_id,
+    aws_secret_access_key=r2_secret_access_key,
 )
 
 
-# TODO: Finish
-@app.route("/api/get-presigned-url", methods=["POST"])
-def get_presigned_url():
-    data = request.json
-    filename = data.get("filename", "export.json")
+@app.route("/")
+def index():
+    return send_from_directory(app.static_folder, index_file)
 
-    upload_url = s3.generate_presigned_url(
-        ClientMethod="put_object",
-        Params={
-            "Bucket": bucket_name,
-            "Key": filename,
-            "ContentType": "application/json",
-        },
-        ExpiresIn=3600,
+
+@app.errorhandler(404)
+def fallback(_e: Exception):
+    return send_from_directory(app.static_folder, index_file)
+
+
+@app.route("/<path:path>")
+def serve_arbitrary(path: str):
+    try:
+        return send_from_directory(app.static_folder, path)
+    except:
+        return send_from_directory(app.static_folder, index_file)
+
+
+@app.route("/api/upload", methods=["POST"])
+@cross_origin(supports_credentials=True)
+def upload_file():
+    file_data = request.json["file"]
+    file_key = request.json["key"]
+
+    boto.put_object(
+        Bucket=r2_bucket_name,
+        Key=file_key,
+        Body=file_data,
+        ContentType="application/json",
     )
 
-    download_url = s3.generate_presigned_url(
-        ClientMethod="get_object",
-        Params={"Bucket": bucket_name, "Key": filename},
-        ExpiresIn=3600,
-    )
+    body = json.dumps({"message": "File uploaded successfully"})
+    return Response(body, status=HTTPStatus.OK, mimetype="application/json")
 
-    return jsonify({"uploadURL": upload_url, "downloadURLs": download_url})
+
+@app.route("/api/download/<filename>", methods=["GET"])
+@cross_origin(supports_credentials=True)
+def download_from_r2(filename: str):
+    try:
+        response = boto.get_object(Bucket=r2_bucket_name, Key=filename)
+        file_content = response["Body"].read()
+
+        return send_file(
+            BytesIO(file_content),
+            as_attachment=True,
+            download_name=filename,
+            mimetype="application/json",
+        )
+    except boto.exceptions.NoSuchKey:
+        body = json.dumps({"error": "Resource not found"})
+        return Response(
+            body, status=HTTPStatus.NOT_FOUND, mimetype="application/json"
+        )
+    except Exception as e:
+        body = json.dumps({"error": str(e)})
+        return Response(
+            body,
+            status=HTTPStatus.INTERNAL_SERVER_ERROR,
+            mimetype="application/json",
+        )
 
 
 @app.route("/api/spotify/callback")
-@cross_origin(origin="*", supports_credentials=True)
+@cross_origin(supports_credentials=True)
 def spotify_callback():
-    session.clear()
     code = request.args.get("code")
     token_info = spotify.get_access_token(code)
     session["token_info"] = token_info
     access_token = token_info["access_token"]
-    return redirect(f"http://localhost:5173/x?t={access_token}")
+    return redirect(f"{domain}/x?t={access_token}")
 
 
 @app.route("/api/spotify/playlists")
-@cross_origin(origin="*", supports_credentials=True)
+@cross_origin(supports_credentials=True)
 def get_playlists():
     access_token = request.args.get("t")
     if not access_token:
@@ -102,11 +164,10 @@ def get_playlists():
         }
         return app.response_class(
             response=json.dumps(response),
-            status=401,
+            status=HTTPStatus.UNAUTHORIZED,
             mimetype="application/json",
         )
 
-    # access_token = token_info["access_token"]
     client = Spotify(auth=access_token)
 
     playlists = SpotifyPlaylists.from_object(client.current_user_playlists())
@@ -134,4 +195,4 @@ if __name__ == "__main__":
         supports_credentials=True,
     )
 
-    app.run(debug=True, port=8000)
+    app.run(debug=True, port=port)

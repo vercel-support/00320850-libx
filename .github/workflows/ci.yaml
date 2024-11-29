@@ -58,24 +58,11 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: ${{ env.NODE_VERSION }}
-        working-directory: www/libx
 
-      - name: Yarn Install
+      - name: Install and Build
         run: |
-          yarn install
-        working-directory: www/libx
-
-      - name: Yarn Lint
-        run: |
-          yarn lint
-        working-directory: www/libx
-
-      - name: Yarn Pretty
-        run: |
-          yarn pretty
-        working-directory: www/libx
-
-      - name: Yarn Build
-        run: |
-          yarn build
-        working-directory: www/libx
+          cd www/libx && \
+            yarn install --frozen-lockfile && \
+            yarn lint && \
+            yarn pretty && \
+            yarn build
