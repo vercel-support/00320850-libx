@@ -64,7 +64,8 @@ dist_folder = "../www/libx/dist"
 
 app = Flask(__name__, static_folder=dist_folder, static_url_path="")
 app.secret_key = os.urandom(32)
-port = 8000
+port = os.environ.get("PORT", 5000)
+env = os.environ.get("ENV", "development")
 
 spotify = SpotifyOAuth(
     client_id=spotify_client_id,
@@ -195,4 +196,5 @@ if __name__ == "__main__":
         supports_credentials=True,
     )
 
-    app.run(debug=True, port=port)
+    debug = env == "development"
+    app.run(debug=debug, port=port)
