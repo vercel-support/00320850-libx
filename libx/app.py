@@ -58,11 +58,7 @@ r2_secret_access_key = os.environ["R2_SECRET_ACCESS_KEY"]
 r2_endpoint_url = f"https://{r2_account_id}.r2.cloudflarestorage.com"
 r2_operation_timeout = 3600
 
-domain = extract_domain(spotify_redirect_uri)
-index_file = "index.html"
-dist_folder = "../www/libx/dist"
-
-app = Flask(__name__, static_folder=dist_folder, static_url_path="")
+app = Flask(__name__, static_folder="../www/libx/dist", static_url_path="")
 app.secret_key = os.urandom(32)
 port = os.environ.get("PORT", 5000)
 env = os.environ.get("ENV", "development")
@@ -84,12 +80,12 @@ boto = boto3.client(
 
 @app.route("/")
 def index():
-    return send_from_directory(app.static_folder, index_file)
+    return send_from_directory(app.static_folder, "index.html")
 
 
 @app.errorhandler(404)
 def fallback(_e: Exception):
-    return send_from_directory(app.static_folder, index_file)
+    return send_from_directory(app.static_folder, "index.html")
 
 
 @app.route("/<path:path>")
@@ -97,20 +93,20 @@ def serve_arbitrary(path: str):
     try:
         return send_from_directory(app.static_folder, path)
     except:
-        return send_from_directory(app.static_folder, index_file)
+        return send_from_directory(app.static_folder, "index.html")
 
 
 @app.route("/api/upload", methods=["POST"])
 @cross_origin(supports_credentials=True)
 def upload_file():
-    file_data = request.json["file"]
-    file_key = request.json["key"]
+    file_key = request.args.get("key")
+    file_data = request.get_data(as_text=True)
 
     boto.put_object(
         Bucket=r2_bucket_name,
         Key=file_key,
         Body=file_data,
-        ContentType="application/json",
+        ContentType="text/csv",
     )
 
     body = json.dumps({"message": "File uploaded successfully"})
@@ -128,13 +124,11 @@ def download_from_r2(filename: str):
             BytesIO(file_content),
             as_attachment=True,
             download_name=filename,
-            mimetype="application/json",
+            mimetype="text/csv",
         )
     except boto.exceptions.NoSuchKey:
         body = json.dumps({"error": "Resource not found"})
-        return Response(
-            body, status=HTTPStatus.NOT_FOUND, mimetype="application/json"
-        )
+        return Response(body, status=HTTPStatus.NOT_FOUND, mimetype="text/csv")
     except Exception as e:
         body = json.dumps({"error": str(e)})
         return Response(
@@ -151,6 +145,7 @@ def spotify_callback():
     token_info = spotify.get_access_token(code)
     session["token_info"] = token_info
     access_token = token_info["access_token"]
+    domain = extract_domain(spotify_redirect_uri)
     return redirect(f"{domain}/x?t={access_token}")
 
 
@@ -166,7 +161,7 @@ def get_playlists():
         return app.response_class(
             response=json.dumps(response),
             status=HTTPStatus.UNAUTHORIZED,
-            mimetype="application/json",
+            mimetype="text/csv",
         )
 
     client = Spotify(auth=access_token)
@@ -174,10 +169,18 @@ def get_playlists():
     playlists = SpotifyPlaylists.from_object(client.current_user_playlists())
     for playlist in playlists:
         if playlist is not None:
-            tracks = Tracks.from_object(client.playlist_tracks(playlist.id))
-            playlist.tracks = tracks
+            playlist.tracks = Tracks.from_object(
+                client.playlist_tracks(playlist.id)
+            )
 
-    return playlists.to_json()
+    csv_content = playlists.to_csv()
+
+    return Response(
+        csv_content,
+        status=HTTPStatus.OK,
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=playlists.csv"},
+    )
 
 
 if __name__ == "__main__":

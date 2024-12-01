@@ -4,7 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 type ActionButtonProps = {
   exporting: boolean;
   downloading: boolean;
-  data: JSON | null;
+  data: string | null;
   onExport: () => Promise<void>;
   onDownload: () => Promise<void>;
 };
@@ -48,7 +48,7 @@ const Export = () => {
   const accessToken = searchParams.get('t');
   const [exporting, setExporting] = useState(false);
   const [downloading, setDownloading] = useState(false);
-  const [data, setData] = useState(null);
+  const [data, setData] = useState<string | null>(null);
 
   const getLibraryExport = useCallback(async () => {
     setExporting(true);
@@ -59,11 +59,11 @@ const Export = () => {
           method: 'GET',
           credentials: 'include',
           headers: {
-            'Content-Type': 'application/json',
+            'Content-Type': 'text/csv',
           },
         }
       );
-      const result = await response.json();
+      const result = await response.text();
       setData(result);
     } catch (error) {
       console.error('Error fetching library export:', error);
@@ -72,17 +72,17 @@ const Export = () => {
     }
   }, [accessToken, url]);
 
-  const uploadFile = useCallback(async (data: JSON, filename: string) => {
-    const response = await fetch(`https://${url.host}/api/upload`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        file: JSON.stringify(data),
-        key: filename,
-      }),
-    });
+  const uploadFile = useCallback(async (data: string, filename: string) => {
+    const response = await fetch(
+      `https://${url.host}/api/upload?key=${encodeURIComponent(filename)}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/csv',
+        },
+        body: data,
+      }
+    );
 
     if (!response.ok) {
       throw new Error('Failed to upload file to backend');
@@ -98,7 +98,7 @@ const Export = () => {
         {
           method: 'GET',
           headers: {
-            'Content-Type': 'application/json',
+            'Content-Type': 'text/csv',
           },
         }
       );
@@ -166,7 +166,7 @@ const Export = () => {
           data={data}
           onExport={getLibraryExport}
           onDownload={() =>
-            handleFileUploadAndDownload('spotify-data.json', data)
+            handleFileUploadAndDownload('spotify-data.csv', data)
           }
         />
       </div>

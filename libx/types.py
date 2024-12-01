@@ -13,10 +13,14 @@ class ExternalURLs:
     def from_object(cls: Type[T], obj: Dict[str, Any]) -> T:
         return cls(**obj)
 
-    def to_json(self) -> str:
-        return json.dumps(
-            self, default=lambda o: o.__dict__, sort_keys=True, indent=4
-        )
+
+@dataclass
+class ExternalURL:
+    spotify: Optional[str]
+
+    @classmethod
+    def from_object(obj: Dict[str, Any]) -> "ExternalURL":
+        return ExternalURL(**obj)
 
 
 @dataclass
@@ -29,10 +33,100 @@ class Image:
     def from_object(cls: Type[T], obj: Dict[str, Any]) -> T:
         return cls(**obj)
 
-    def to_json(self) -> str:
-        return json.dumps(
-            self, default=lambda o: o.__dict__, sort_keys=True, indent=4
-        )
+
+@dataclass
+class VideoThumbnail:
+    url: Optional[str]
+
+    @classmethod
+    def from_object(obj: Dict[str, Any]) -> "VideoThumbnail":
+        return VideoThumbnail(**obj)
+
+
+@dataclass
+class Artist:
+    external_urls: Optional[ExternalURL]
+    href: Optional[str]
+    id: Optional[str]
+    name: Optional[str]
+    type: Optional[str]
+    uri: Optional[str]
+
+    @classmethod
+    def from_object(obj: Dict[str, Any]) -> "Artist":
+        obj["external_urls"] = ExternalURL.from_object(obj["external_urls"])
+        return Artist(**obj)
+
+
+@dataclass
+class Album:
+    available_markets: List[str]
+    type: Optional[str]
+    album_type: Optional[str]
+    href: Optional[str]
+    id: Optional[str]
+    images: List[Image]
+    name: Optional[str]
+    release_date: Optional[str]
+    release_date_precision: Optional[str]
+    uri: Optional[str]
+    artists: List[Artist]
+    external_urls: Optional[ExternalURL]
+    total_tracks: Optional[int]
+
+    @classmethod
+    def from_object(obj: Dict[str, Any]) -> "Album":
+        obj["artists"] = [
+            Artist.from_object(artist) for artist in obj["artists"]
+        ]
+        obj["images"] = [Image.from_object(image) for image in obj["images"]]
+        obj["external_urls"] = ExternalURL.from_object(obj["external_urls"])
+        return Album(**obj)
+
+
+@dataclass
+class Track:
+    preview_url: Optional[str]
+    available_markets: List[str]
+    explicit: Optional[bool]
+    type: Optional[str]
+    episode: Optional[bool]
+    track: Optional[bool]
+    album: Optional[Album]
+    artists: List[Artist]
+    disc_number: Optional[int]
+    track_number: Optional[int]
+    duration_ms: Optional[int]
+    external_ids: Optional[dict]
+    external_urls: Optional[ExternalURL]
+    href: Optional[str]
+    id: Optional[str]
+    name: Optional[str]
+    popularity: Optional[int]
+    uri: Optional[str]
+    is_local: Optional[bool]
+
+    @classmethod
+    def from_object(obj: Dict[str, Any]) -> "Track":
+        obj["album"] = Album.from_object(obj["album"])
+        obj["artists"] = [
+            Artist.from_object(artist) for artist in obj["artists"]
+        ]
+        return Track(**obj)
+
+
+@dataclass
+class AddedBy:
+    external_urls: Optional[ExternalURL]
+    href: Optional[str]
+    id: Optional[str]
+    type: Optional[str]
+    uri: Optional[str]
+
+    @classmethod
+    def from_object(obj: Dict[str, Any]) -> "AddedBy":
+        obj["external_urls"] = ExternalURL.from_object(obj["external_urls"])
+        return AddedBy(**obj)
 
 
 @dataclass
@@ -48,26 +142,6 @@ class Owner:
     def from_object(cls: Type[T], obj: Dict[str, Any]) -> T:
         obj["external_urls"] = ExternalURLs.from_object(obj["external_urls"])
         return cls(**obj)
-
-    def to_json(self) -> str:
-        return json.dumps(
-            self, default=lambda o: o.__dict__, sort_keys=True, indent=4
-        )
-
-
-@dataclass
-class Tracks:
-    href: str
-    total: int
-
-    @classmethod
-    def from_object(cls: Type[T], obj: Dict[str, Any]) -> T:
-        return cls(**obj)
-
-    def to_json(self) -> str:
-        return json.dumps(
-            self, default=lambda o: o.__dict__, sort_keys=True, indent=4
-        )
 
 
 @dataclass
@@ -86,6 +160,11 @@ class TrackItem:
             uri=obj["uri"],
         )
 
+    def to_csv_row(self) -> str:
+        return ",".join(
+            [self.name, " + ".join(self.artists), self.album, self.uri]
+        )
+
 
 @dataclass
 class Tracks:
@@ -101,10 +180,27 @@ class Tracks:
         ]
         return cls(href=obj["href"], total=obj["total"], items=items)
 
-    def to_json(self) -> str:
-        return json.dumps(
-            self, default=lambda o: o.__dict__, sort_keys=True, indent=4
+    def to_csv_row(self) -> str:
+        return "\n".join([item.to_csv_row() for item in self.items])
+
+
+@dataclass
+class PlaylistTrack:
+    added_at: Optional[str]
+    added_by: Optional[AddedBy]
+    is_local: Optional[bool]
+    primary_color: Optional[str]
+    track: Optional[Track]
+    video_thumbnail: Optional[VideoThumbnail]
+
+    @classmethod
+    def from_object(obj: Dict[str, Any]) -> "PlaylistTrack":
+        obj["added_by"] = AddedBy.from_object(obj["added_by"])
+        obj["track"] = Track.from_object(obj["track"])
+        obj["video_thumbnail"] = VideoThumbnail.from_object(
+            obj["video_thumbnail"]
         )
+        return PlaylistTrack(**obj)
 
 
 @dataclass
@@ -127,17 +223,16 @@ class PlaylistItem:
     @classmethod
     def from_object(cls: Type[T], obj: Dict[str, Any]) -> T:
         obj["external_urls"] = ExternalURLs.from_object(obj["external_urls"])
-        obj["images"] = [
-            Image.from_object(image) for image in obj.get("images", [])
-        ]
+        obj["images"] = [Image.from_object(image) for image in obj["images"]]
         obj["owner"] = Owner.from_object(obj["owner"])
         obj["tracks"] = Tracks.from_object(obj["tracks"])
         return cls(**obj)
 
-    def to_json(self) -> str:
-        return json.dumps(
-            self, default=lambda o: o.__dict__, sort_keys=True, indent=4
-        )
+    def to_csv_row(self) -> str:
+        rows = [item.to_csv_row() for item in self.tracks.items]
+        for row in rows:
+            row = ",".join([self.name, self.owner.display_name, self.uri]) + row
+        return "\n".join(rows)
 
 
 @dataclass
@@ -170,179 +265,15 @@ class SpotifyPlaylists:
             items=items,
         )
 
-    def to_json(self) -> dict:
-        return self.__dict__
+    def to_csv(self) -> str:
+        csv_rows = []
+        csv_header = "Playlist Name,Owner,Playlist URI,Track Name,Artists,Album,Track URI"
 
+        for playlist in self.items:
+            if playlist and playlist.tracks and playlist.tracks.items:
+                for track in playlist.tracks.items:
+                    csv_rows.append(
+                        f"{playlist.name},{playlist.owner.display_name},{playlist.uri},{track.to_csv_row()}"
+                    )
 
-@dataclass
-class ExternalURL:
-    spotify: Optional[str]
-
-    @classmethod
-    def from_object(obj: Dict[str, Any]) -> "ExternalURL":
-        return ExternalURL(**obj)
-
-    def to_json(self) -> str:
-        return json.dumps(
-            self, default=lambda o: o.__dict__, sort_keys=True, indent=4
-        )
-
-
-@dataclass
-class Artist:
-    external_urls: Optional[ExternalURL]
-    href: Optional[str]
-    id: Optional[str]
-    name: Optional[str]
-    type: Optional[str]
-    uri: Optional[str]
-
-    @classmethod
-    def from_object(obj: Dict[str, Any]) -> "Artist":
-        obj["external_urls"] = ExternalURL.from_object(obj["external_urls"])
-        return Artist(**obj)
-
-    def to_json(self) -> str:
-        return json.dumps(
-            self, default=lambda o: o.__dict__, sort_keys=True, indent=4
-        )
-
-
-@dataclass
-class Album:
-    available_markets: List[str]
-    type: Optional[str]
-    album_type: Optional[str]
-    href: Optional[str]
-    id: Optional[str]
-    images: List[Image]
-    name: Optional[str]
-    release_date: Optional[str]
-    release_date_precision: Optional[str]
-    uri: Optional[str]
-    artists: List[Artist]
-    external_urls: Optional[ExternalURL]
-    total_tracks: Optional[int]
-
-    @classmethod
-    def from_object(obj: Dict[str, Any]) -> "Album":
-        obj["artists"] = [
-            Artist.from_object(artist) for artist in obj["artists"]
-        ]
-        obj["images"] = [Image.from_object(image) for image in obj["images"]]
-        obj["external_urls"] = ExternalURL.from_object(obj["external_urls"])
-        return Album(**obj)
-
-    def to_json(self) -> str:
-        return json.dumps(
-            self, default=lambda o: o.__dict__, sort_keys=True, indent=4
-        )
-
-
-@dataclass
-class Track:
-    preview_url: Optional[str]
-    available_markets: List[str]
-    explicit: Optional[bool]
-    type: Optional[str]
-    episode: Optional[bool]
-    track: Optional[bool]
-    album: Optional[Album]
-    artists: List[Artist]
-    disc_number: Optional[int]
-    track_number: Optional[int]
-    duration_ms: Optional[int]
-    external_ids: Optional[dict]
-    external_urls: Optional[ExternalURL]
-    href: Optional[str]
-    id: Optional[str]
-    name: Optional[str]
-    popularity: Optional[int]
-    uri: Optional[str]
-    is_local: Optional[bool]
-
-    def get_artists(self) -> str:
-        return " ".join([artist.name.lower() for artist in self.artists])
-
-    @classmethod
-    def from_object(obj: Dict[str, Any]) -> "Track":
-        obj["album"] = Album.from_object(obj["album"])
-        obj["artists"] = [
-            Artist.from_object(artist) for artist in obj["artists"]
-        ]
-        return Track(**obj)
-
-    @property
-    def terms(self) -> List[str]:
-        items = (
-            self.album.name.lower()
-            + " "
-            + self.name.lower()
-            + " "
-            + self.get_artists()
-        )
-        return list(filter(lambda x: x.strip() != "", items.split(" ")))
-
-    def to_json(self) -> str:
-        data = json.dumps(
-            self, default=lambda o: o.__dict__, sort_keys=True, indent=4
-        )
-        data["terms"] = self.terms
-        return json.dumps(data)
-
-
-@dataclass
-class VideoThumbnail:
-    url: Optional[str]
-
-    @classmethod
-    def from_object(obj: Dict[str, Any]) -> "VideoThumbnail":
-        return VideoThumbnail(**obj)
-
-    def to_json(self) -> str:
-        return json.dumps(
-            self, default=lambda o: o.__dict__, sort_keys=True, indent=4
-        )
-
-
-@dataclass
-class AddedBy:
-    external_urls: Optional[ExternalURL]
-    href: Optional[str]
-    id: Optional[str]
-    type: Optional[str]
-    uri: Optional[str]
-
-    @classmethod
-    def from_object(obj: Dict[str, Any]) -> "AddedBy":
-        obj["external_urls"] = ExternalURL.from_object(obj["external_urls"])
-        return AddedBy(**obj)
-
-    def to_json(self) -> str:
-        return json.dumps(
-            self, default=lambda o: o.__dict__, sort_keys=True, indent=4
-        )
-
-
-@dataclass
-class PlaylistTrack:
-    added_at: Optional[str]
-    added_by: Optional[AddedBy]
-    is_local: Optional[bool]
-    primary_color: Optional[str]
-    track: Optional[Track]
-    video_thumbnail: Optional[VideoThumbnail]
-
-    @classmethod
-    def from_object(obj: Dict[str, Any]) -> "PlaylistTrack":
-        obj["added_by"] = AddedBy.from_object(obj["added_by"])
-        obj["track"] = Track.from_object(obj["track"])
-        obj["video_thumbnail"] = VideoThumbnail.from_object(
-            obj["video_thumbnail"]
-        )
-        return PlaylistTrack(**obj)
-
-    def to_json(self) -> str:
-        return json.dumps(
-            self, default=lambda o: o.__dict__, sort_keys=True, indent=4
-        )
+        return f"{csv_header}\n" + "\n".join(csv_rows)
