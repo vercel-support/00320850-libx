@@ -69,21 +69,23 @@
   .content-box {
     border: 1px solid blue;
     flex-direction: column;
-    width: 90%; /* Adjust for smaller screens */
+    width: 300px; /* Adjust for smaller screens */
     height: auto; /* Allow flexible height */
     display: flex;
     align-items: center;
     color: white;
   }
 
-  .content-box h1 {
+  .content-box h2 {
     margin: 0;
-    font-size: 1.5rem;
+    font-size: 1.1rem;
+    color: white;
   }
 
   .content-box p {
     text-align: center;
     font-size: 0.9rem;
+    margin-bottom: 20px;
   }
 
   .login-section {

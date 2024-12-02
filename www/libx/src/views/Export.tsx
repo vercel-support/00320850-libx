@@ -1,9 +1,13 @@
 import { useCallback, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import IconCheckmarkCircleOutline from '../assets/CheckmarkCircleOutline';
+import './../css/Export.css';
+import './../css/global.css';
 
 type ActionButtonProps = {
   exporting: boolean;
   downloading: boolean;
+  downloaded: boolean;
   data: string | null;
   onExport: () => Promise<void>;
   onDownload: () => Promise<void>;
@@ -12,6 +16,7 @@ type ActionButtonProps = {
 const ActionButton = ({
   exporting,
   downloading,
+  downloaded,
   data,
   onExport,
   onDownload,
@@ -31,6 +36,10 @@ const ActionButton = ({
     }
   };
 
+  if (downloaded) {
+    return <IconCheckmarkCircleOutline />;
+  }
+
   return (
     <button
       onClick={handleClick}
@@ -48,6 +57,7 @@ const Export = () => {
   const accessToken = searchParams.get('t');
   const [exporting, setExporting] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [downloaded, setDownloaded] = useState(false);
   const [data, setData] = useState<string | null>(null);
 
   const getLibraryExport = useCallback(async () => {
@@ -85,9 +95,11 @@ const Export = () => {
     );
 
     if (!response.ok) {
-      throw new Error('Failed to upload file to backend');
+      throw new Error(
+        `Failed to upload file: (${response.status}) ${response.statusText}`
+      );
     }
-    console.log('File uploaded successfully via backend');
+    console.log('File uploaded successfully');
   }, []);
 
   const downloadFile = useCallback(async (filename: string) => {
@@ -104,7 +116,9 @@ const Export = () => {
       );
 
       if (!response.ok) {
-        throw new Error('Failed to upload file to backend');
+        throw new Error(
+          `Failed to upload file: (${response.status}) ${response.statusText}`
+        );
       }
 
       // Create a blob and trigger a download
@@ -122,6 +136,7 @@ const Export = () => {
 
       const fileData = await response.json();
       console.log('Downloaded file:', fileData);
+      setDownloaded(true);
     } finally {
       setDownloading(false);
     }
@@ -133,38 +148,49 @@ const Export = () => {
         await uploadFile(data, filename);
         await downloadFile(filename);
       } catch (error) {
-        console.error('Error handling process:', error);
+        console.error('Error downloading file:', error);
       }
     },
     [uploadFile, downloadFile]
   );
 
+  const infoHeading = () => {
+    if (downloaded) {
+      return (
+        <>
+          <h2>Your library export has been downloaded!</h2>
+          <p>Click the button below to generate a new export.</p>
+        </>
+      );
+    }
+    if (data) {
+      return (
+        <>
+          <h2>Your library export is ready!</h2>
+          <p>Click the button below to download your data.</p>
+        </>
+      );
+    }
+
+    return (
+      <>
+        <h2>Generate your library export</h2>
+        <p>This will generate an export for your entire Spotify library.</p>
+      </>
+    );
+  };
+
   return (
-    <div
-      style={{
-        border: '1px solid red',
-        width: '100vw',
-        height: '100vh',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-      }}
-    >
-      <div
-        style={{
-          border: '1px solid blue',
-          width: 500,
-          height: 500,
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-        }}
-      >
+    <div className="app-container">
+      <div className="content-box">
+        {infoHeading()}
         <ActionButton
           exporting={exporting}
           downloading={downloading}
+          downloaded={downloaded}
           data={data}
           onExport={getLibraryExport}
+          // TODO: Use UUID for filename
           onDownload={() =>
             handleFileUploadAndDownload('spotify-data.csv', data)
           }

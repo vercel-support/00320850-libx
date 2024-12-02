@@ -37,7 +37,6 @@ function Index() {
           <div className="coffee-button">
             <a href="https://www.buymeacoffee.com/rashad.wiki">
               <img
-                style={{ width: 150 }}
                 src="https://img.buymeacoffee.com/button-api/?text=Buy me a coffee&emoji=&slug=rashad.wiki&button_colour=FFDD00&font_colour=000000&font_family=Lato&outline_colour=000000&coffee_colour=ffffff"
                 alt="Buy me a coffee"
               />
