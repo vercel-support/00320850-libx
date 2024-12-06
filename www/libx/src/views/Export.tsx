@@ -1,8 +1,8 @@
 import { useCallback, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import IconCheckmarkCircleOutline from '../assets/CheckmarkCircleOutline';
-import './../css/Export.css';
-import './../css/global.css';
+import { Box, Button, Flex, Heading, Text, Spinner } from '@chakra-ui/react';
+import IconCheckmarkCircleOutlineIcon from '../assets/CheckmarkCircleOutlineIcon';
+import { AnyError } from '../global';
 
 type ActionButtonProps = {
   exporting: boolean;
@@ -37,17 +37,28 @@ const ActionButton = ({
   };
 
   if (downloaded) {
-    return <IconCheckmarkCircleOutline />;
+    return <IconCheckmarkCircleOutlineIcon />;
   }
 
   return (
-    <button
+    <Button
       onClick={handleClick}
-      style={{ border: '1px solid black' }}
       disabled={isLoading}
+      bg="black"
+      color="white"
+      border="1px solid black"
+      borderRadius="10px"
+      h="50px"
+      w={['150px', '200px']}
+      display="flex"
+      alignItems="center"
+      justifyContent="center"
+      _hover={{ bg: 'gray.700' }}
+      gap={2}
     >
+      {isLoading && <Spinner size="sm" color="white" />}
       {getLabel()}
-    </button>
+    </Button>
   );
 };
 
@@ -82,25 +93,28 @@ const Export = () => {
     }
   }, [accessToken, url]);
 
-  const uploadFile = useCallback(async (data: string, filename: string) => {
-    const response = await fetch(
-      `https://${url.host}/api/upload?key=${encodeURIComponent(filename)}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'text/csv',
-        },
-        body: data,
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(
-        `Failed to upload file: (${response.status}) ${response.statusText}`
+  const uploadFile = useCallback(
+    async (data: string | null, filename: string) => {
+      const response = await fetch(
+        `https://${url.host}/api/upload?key=${encodeURIComponent(filename)}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'text/csv',
+          },
+          body: data,
+        }
       );
-    }
-    console.log('File uploaded successfully');
-  }, []);
+
+      if (!response.ok) {
+        throw new Error(
+          `Failed to upload file: (${response.status}) ${response.statusText}`
+        );
+      }
+      console.log('File uploaded successfully');
+    },
+    []
+  );
 
   const downloadFile = useCallback(async (filename: string) => {
     setDownloading(true);
@@ -116,12 +130,12 @@ const Export = () => {
       );
 
       if (!response.ok) {
-        throw new Error(
+        alert(
           `Failed to upload file: (${response.status}) ${response.statusText}`
         );
+        return;
       }
 
-      // Create a blob and trigger a download
       const blob = await response.blob();
       const uri = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -130,12 +144,6 @@ const Export = () => {
       link.click();
       window.URL.revokeObjectURL(uri);
 
-      if (!response.ok) {
-        throw new Error('Failed to download file.');
-      }
-
-      const fileData = await response.json();
-      console.log('Downloaded file:', fileData);
       setDownloaded(true);
     } finally {
       setDownloading(false);
@@ -143,12 +151,13 @@ const Export = () => {
   }, []);
 
   const handleFileUploadAndDownload = useCallback(
-    async (filename: string, data: any) => {
+    async (filename: string, data: string | null) => {
       try {
         await uploadFile(data, filename);
         await downloadFile(filename);
-      } catch (error) {
-        console.error('Error downloading file:', error);
+      } catch (e: AnyError) {
+        alert(`Error downloading file: ${e.toString()}`);
+        return;
       }
     },
     [uploadFile, downloadFile]
@@ -158,31 +167,60 @@ const Export = () => {
     if (downloaded) {
       return (
         <>
-          <h2>Your library export has been downloaded!</h2>
-          <p>Click the button below to generate a new export.</p>
+          <Heading as="h2" size="lg" mb={4} textAlign="center">
+            Your library export has been downloaded!
+          </Heading>
+          <Text textAlign="center">
+            Click the button below to generate a new export.
+          </Text>
         </>
       );
     }
     if (data) {
       return (
         <>
-          <h2>Your library export is ready!</h2>
-          <p>Click the button below to download your data.</p>
+          <Heading as="h2" size="lg" mb={4} textAlign="center">
+            Your library export is ready!
+          </Heading>
+          <Text textAlign="center">
+            Click the button below to download your data.
+          </Text>
         </>
       );
     }
 
     return (
       <>
-        <h2>Generate your library export</h2>
-        <p>This will generate an export for your entire Spotify library.</p>
+        <Heading as="h2" size="lg" mb={4} textAlign="center">
+          Generate your library export
+        </Heading>
+        <Text textAlign="center">
+          This will generate an export for your entire Spotify library.
+        </Text>
       </>
     );
   };
 
   return (
-    <div className="app-container">
-      <div className="content-box">
+    <Box
+      w="100vw"
+      h="100vh"
+      bg="black"
+      display="flex"
+      justifyContent="center"
+      alignItems="center"
+      flexDirection="column"
+      border="1px solid red"
+    >
+      <Flex
+        flexDirection="column"
+        w={['90%', '500px']}
+        h={['auto', '500px']}
+        alignItems="center"
+        color="white"
+        border="1px solid blue"
+        p={4}
+      >
         {infoHeading()}
         <ActionButton
           exporting={exporting}
@@ -190,13 +228,12 @@ const Export = () => {
           downloaded={downloaded}
           data={data}
           onExport={getLibraryExport}
-          // TODO: Use UUID for filename
           onDownload={() =>
             handleFileUploadAndDownload('spotify-data.csv', data)
           }
         />
-      </div>
-    </div>
+      </Flex>
+    </Box>
   );
 };
 

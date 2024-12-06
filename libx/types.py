@@ -1,4 +1,3 @@
-import json
 from dataclasses import dataclass
 from typing import *
 
@@ -161,6 +160,7 @@ class TrackItem:
         )
 
     def to_csv_row(self) -> str:
+        # TODO: Ensure no ',' chars are in self.artists
         return ",".join(
             [self.name, " + ".join(self.artists), self.album, self.uri]
         )
@@ -179,9 +179,6 @@ class Tracks:
             for item in obj.get("items", [])
         ]
         return cls(href=obj["href"], total=obj["total"], items=items)
-
-    def to_csv_row(self) -> str:
-        return "\n".join([item.to_csv_row() for item in self.items])
 
 
 @dataclass
@@ -227,12 +224,6 @@ class PlaylistItem:
         obj["owner"] = Owner.from_object(obj["owner"])
         obj["tracks"] = Tracks.from_object(obj["tracks"])
         return cls(**obj)
-
-    def to_csv_row(self) -> str:
-        rows = [item.to_csv_row() for item in self.tracks.items]
-        for row in rows:
-            row = ",".join([self.name, self.owner.display_name, self.uri]) + row
-        return "\n".join(rows)
 
 
 @dataclass
