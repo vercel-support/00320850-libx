@@ -1,0 +1,36 @@
+{
+  "builds": [
+    {
+      "src": "www/libx/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "installCommand": "yarn install",
+        "buildCommand": "yarn build",
+        "outputDirectory": "www/libx/dist"
+      }
+    },
+    {
+      "src": "libx/app.py",
+      "use": "@vercel/python",
+      "config": {
+        "runtime": "python3.12",
+        "installCommand": "pip install pipenv && pipenv install --deploy",
+        "startCommand": "FLASK_APP=libx/app.py flask run --host=0.0.0.0 --port=$PORT"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/libx/app.py"
+    },
+    {
+      "src": "/static/(.*)",
+      "dest": "/www/libx/dist/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/libx/app.py"
+    }
+  ]
+}
