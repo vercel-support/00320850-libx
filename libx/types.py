@@ -257,14 +257,14 @@ class SpotifyPlaylists:
         )
 
     def to_csv(self) -> str:
-        csv_rows = []
-        csv_header = "Playlist Name,Owner,Playlist URI,Track Name,Artists,Album,Track URI"
+        rows = []
+        headers = "Playlist Name,Owner,Playlist URI,Track Name,Artists,Album,Track URI"
 
         for playlist in self.items:
             if playlist and playlist.tracks and playlist.tracks.items:
                 for track in playlist.tracks.items:
-                    csv_rows.append(
+                    rows.append(
                         f"{playlist.name},{playlist.owner.display_name},{playlist.uri},{track.to_csv_row()}"
                     )
 
-        return f"{csv_header}\n" + "\n".join(csv_rows)
+        return f"{headers}\n" + "\n".join(rows)

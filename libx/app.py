@@ -61,8 +61,7 @@ r2_operation_timeout = 3600
 
 app = Flask(__name__, static_folder="../www/libx/dist", static_url_path="")
 app.secret_key = os.urandom(32)
-port = os.environ.get("PORT", 5000)
-env = os.environ.get("ENV", "development")
+
 
 spotify = SpotifyOAuth(
     client_id=spotify_client_id,
@@ -85,7 +84,7 @@ def index():
 
 
 @app.errorhandler(404)
-def fallback(_e: Exception):
+def fallback(e: Exception):
     return send_from_directory(app.static_folder, "index.html")
 
 
@@ -166,18 +165,10 @@ def get_playlists():
         )
 
     client = Spotify(auth=access_token)
-
     playlists = SpotifyPlaylists.from_object(client.current_user_playlists())
-    for playlist in playlists:
-        if playlist is not None:
-            playlist.tracks = Tracks.from_object(
-                client.playlist_tracks(playlist.id)
-            )
-
-    csv_content = playlists.to_csv()
 
     return Response(
-        csv_content,
+        playlists.to_csv(),
         status=HTTPStatus.OK,
         mimetype="text/csv",
         headers={"Content-Disposition": "attachment; filename=playlists.csv"},
@@ -187,9 +178,8 @@ def get_playlists():
 if __name__ == "__main__":
 
     app.config["SESSION_TYPE"] = "filesystem"
-    app.config["SESSION_PERMANENT"] = False
+    app.config["SESSION_PERMANENT"] = True
     app.config["SESSION_COOKIE_NAME"] = "spotify-login-session"
-    app.config["SESSION_COOKIE_DOMAIN"] = "localhost"
     app.config["SESSION_COOKIE_SAMESITE"] = "None"
     app.config["SESSION_COOKIE_SECURE"] = True
 
@@ -200,5 +190,5 @@ if __name__ == "__main__":
         supports_credentials=True,
     )
 
-    debug = env == "development"
-    app.run(debug=debug, port=port)
+    debug = os.environ.get("ENV", "development") == "development"
+    app.run(debug=debug)

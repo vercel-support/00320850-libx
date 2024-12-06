@@ -1,17 +1,14 @@
+import { Heading } from '@chakra-ui/react';
+import BackgroundImg from '../components/BackgroundImg';
+import Content from '../components/Content';
+
 function NotFound() {
   return (
-    <div
-      style={{
-        border: '1px solid red',
-        width: '100vw',
-        height: '100vh',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-      }}
-    >
-      <h1>Not Found</h1>
-    </div>
+    <BackgroundImg>
+      <Content>
+        <Heading as="h1">Not Found</Heading>
+      </Content>
+    </BackgroundImg>
   );
 }
 

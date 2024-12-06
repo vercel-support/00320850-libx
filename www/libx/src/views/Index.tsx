@@ -7,7 +7,9 @@ import {
   Link,
   Image,
 } from '@chakra-ui/react';
-import SpotifyIcon from '../assets/icons/SpotifyIcon';
+import BackgroundImg from '../components/BackgroundImg';
+import Content from '../components/Content';
+import SpotifyIcon from '../components/icons/SpotifyIcon';
 
 const CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID;
 const REDIRECT_URI = import.meta.env.VITE_SPOTIFY_REDIRECT_URI;
@@ -16,41 +18,8 @@ const AUTH_URL = `https://accounts.spotify.com/authorize?response_type=token&cli
 
 function Index() {
   return (
-    <Box
-      w="100vw"
-      h="100vh"
-      bg="gray.800"
-      bgImage="url('/assets/img/bg.webp')"
-      bgAttachment="fixed"
-      bgSize="cover"
-      bgPos="center"
-      display="flex"
-      justifyContent="center"
-      alignItems="center"
-    >
-      <Box
-        w={['90%', '450px']}
-        h="100%"
-        bg="#075049"
-        opacity="0.5"
-        position="absolute"
-        borderRadius={['25px', '25px']}
-        boxShadow="lg"
-        mt={['20%', '20%']}
-      />
-      <Flex
-        flexDirection="column"
-        w={['90%', '450px']}
-        h="100%"
-        alignItems="center"
-        color="white"
-        bg="transparent"
-        position="relative"
-        borderRadius={['25px', '25px']}
-        p={4}
-        pt={['10px', '100px']}
-        mt={['20%', '20%']}
-      >
+    <BackgroundImg>
+      <Content>
         <Heading as="h1" size="lg" mb={4}>
           Save your music!
         </Heading>
@@ -101,8 +70,8 @@ function Index() {
             </Link>
           </Box>
         </Flex>
-      </Flex>
-    </Box>
+      </Content>
+    </BackgroundImg>
   );
 }
 
