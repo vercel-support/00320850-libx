@@ -1,24 +1,15 @@
-import { Button, Spinner } from '@chakra-ui/react';
+import { Button } from '@chakra-ui/react';
 
-// TODO: Redux eventually
 type ActionBtnProps = {
-  loading: boolean;
   title: string;
   onClick: any;
 };
 
-const ActionBtn = ({ loading, title, onClick }: ActionBtnProps) => {
-  const label = (): string => {
-    if (loading) {
-      return `${title}ing...`;
-    }
-    return title;
-  };
+const ActionBtn = ({ title, onClick }: ActionBtnProps) => {
 
   return (
     <Button
       onClick={onClick}
-      disabled={loading}
       bg="black"
       color="white"
       border="1px solid black"
@@ -31,8 +22,7 @@ const ActionBtn = ({ loading, title, onClick }: ActionBtnProps) => {
       _hover={{ bg: 'gray.700' }}
       gap={2}
     >
-      {loading && <Spinner size="sm" color="white" />}
-      {label()}
+      {title}
     </Button>
   );
 };

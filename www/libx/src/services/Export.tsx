@@ -1,40 +1,21 @@
+import { useDispatch, useSelector } from 'react-redux';
 import { useCallback } from 'react';
-import { Null } from '../global';
+import { Action, State } from '../store';
 
-type Setter = any;
+function useExport() {
+  const dispatch = useDispatch();
+  const data = useSelector((state: State) => state.export.data);
+  const downloadURI = useSelector((state: State) => state.download.downloadURI);
+  const url = new URL(import.meta.env.VITE_SPOTIFY_REDIRECT_URI);
 
-class Export {
-  private url: URL;
-  private accessToken: string;
-  private setDownloading: Null<Setter>;
-  private setExporting: Null<Setter>;
-  private data: Null<string>;
-  private downloadURI: Null<string>;
-
-  constructor(url: URL, accessToken: string) {
-    this.url = url;
-    this.accessToken = accessToken;
-    this.setDownloading = null;
-    this.setExporting = null;
-    this.data = null;
-    this.downloadURI = null;
-  }
-
-  onDownloading = useCallback((func: Setter): Export => {
-    this.setDownloading = func;
-    return this;
-  }, []);
-
-  onExporting = useCallback((func: Setter): Export => {
-    this.setExporting = func;
-    return this;
-  }, []);
-
-  getLibraryExport = useCallback(async () => {
-    this.setExporting(true);
+  const getLibraryExport = useCallback(async (accessToken: string) => {
+    dispatch({
+      type: Action.SET_EXPORT_LOADING,
+      payload: true
+    })
     try {
       const response = await fetch(
-        `https://${this.url.host}/api/spotify/playlists?t=${this.accessToken}`,
+        `https://${url.host}/api/spotify/playlists?t=${accessToken}`,
         {
           method: 'GET',
           credentials: 'include',
@@ -44,23 +25,38 @@ class Export {
         }
       );
       const result = await response.text();
-      this.data = result;
+      dispatch({
+        type: Action.SET_EXPORT_DATA,
+        payload: result,
+      });
+
+      dispatch({
+        type: Action.SET_EXPORT_LOADING,
+        pyaload: false,
+      });
     } catch (error) {
       console.error('Error fetching library export:', error);
+      dispatch({
+        type: Action.SET_EXPORT_ERROR,
+        payload: error,
+      });
     } finally {
-      this.setExporting(false);
+      dispatch({
+        type: Action.SET_EXPORT_LOADING,
+        pyaload: false,
+      });
     }
   }, []);
 
-  uploadFile = useCallback(async (filename: string) => {
+  const uploadFile = useCallback(async (filename: string) => {
     const response = await fetch(
-      `https://${this.url.host}/api/upload?key=${encodeURIComponent(filename)}`,
+      `https://${url.host}/api/upload?key=${encodeURIComponent(filename)}`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'text/csv',
         },
-        body: this.data,
+        body: data,
       }
     );
 
@@ -72,15 +68,18 @@ class Export {
     console.log('File uploaded successfully');
   }, []);
 
-  downloadFile = useCallback(async () => {
+  const downloadFile = useCallback(async () => {
     // TODO: Use some UUID here.
     const filename = `spotify-123.csv`;
-    await this.uploadFile(filename);
+    await uploadFile(filename);
 
-    this.setDownloading(true);
+    dispatch({
+      type: Action.SET_DOWNLOAD_LOADING,
+      payload: true,
+    });
     try {
       const response = await fetch(
-        `https://${this.url.host}/api/download/${filename}`,
+        `https://${url.host}/api/download/${filename}`,
         {
           method: 'GET',
           headers: {
@@ -90,32 +89,50 @@ class Export {
       );
 
       if (!response.ok) {
-        alert(
-          `Failed to upload file: (${response.status}) ${response.statusText}`
-        );
+        dispatch({
+          type: Action.SET_DOWNLOAD_ERROR,
+          payload: new Error(
+            `Failed to download file: (${response.status}) ${response.statusText}`
+          ),
+        });
         return;
       }
 
       const blob = await response.blob();
-      this.downloadURI = window.URL.createObjectURL(blob);
+      const uri = window.URL.createObjectURL(blob);
+
+      dispatch({
+        type: Action.SET_DOWNLOAD_URI,
+        payload: uri,
+      });
       const link = document.createElement('a');
-      link.href = this.downloadURI;
+      link.href = uri;
       link.download = filename;
       link.click();
-      window.URL.revokeObjectURL(this.downloadURI);
+      window.URL.revokeObjectURL(uri);
     } finally {
-      this.setDownloading(false);
+      dispatch({
+        type: Action.SET_DOWNLOAD_LOADING,
+        payload: false,
+      });
     }
   }, []);
 
-  exportIsEmpty = () => {
+  const exportIsEmpty = () => {
     // Download can still be "" if it fails
-    return !this.data;
+    return !data;
   };
 
-  downloadIsEmpty = () => {
-    return this.downloadURI === null;
+  const downloadIsEmpty = () => {
+    return downloadURI === null;
+  };
+
+  return {
+    getLibraryExport,
+    downloadFile,
+    exportIsEmpty,
+    downloadIsEmpty,
   };
 }
 
-export default Export;
+export { useExport };

@@ -4,7 +4,7 @@ import Content from '../components/Content';
 
 function NotFound() {
   return (
-    <BackgroundImg>
+    <BackgroundImg mediaURL="/assets/img/bg.webp">
       <Content>
         <Heading as="h1">Not Found</Heading>
       </Content>

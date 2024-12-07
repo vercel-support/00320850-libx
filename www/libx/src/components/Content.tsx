@@ -1,6 +1,11 @@
+import { ReactNode } from 'react';
 import { Box, Flex } from '@chakra-ui/react';
 
-function ContentContainer() {
+type ContentContainerProps = {
+  children: ReactNode;
+};
+
+function ContentContainer({ children }: ContentContainerProps) {
   return (
     <>
       <Box
@@ -25,7 +30,9 @@ function ContentContainer() {
         p={4}
         pt={['10px', '100px']}
         mt={['20%', '20%']}
-      ></Flex>
+      >
+        {children}
+      </Flex>
     </>
   );
 }
