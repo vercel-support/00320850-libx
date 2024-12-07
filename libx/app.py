@@ -166,6 +166,11 @@ def get_playlists():
 
     client = Spotify(auth=access_token)
     playlists = SpotifyPlaylists.from_object(client.current_user_playlists())
+    for playlist in playlists:
+        if playlist is not None:
+            playlist.tracks = Tracks.from_object(
+                client.playlist_tracks(playlist.id)
+            )
 
     return Response(
         playlists.to_csv(),

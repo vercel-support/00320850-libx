@@ -1,6 +1,8 @@
 import { useDispatch, useSelector } from 'react-redux';
 import { useCallback } from 'react';
+import { v4 } from 'uuid';
 import { Action, State } from '../store';
+import { AnyError } from '../global';
 
 function useExport() {
   const dispatch = useDispatch();
@@ -11,8 +13,8 @@ function useExport() {
   const getLibraryExport = useCallback(async (accessToken: string) => {
     dispatch({
       type: Action.SET_EXPORT_LOADING,
-      payload: true
-    })
+      payload: true,
+    });
     try {
       const response = await fetch(
         `https://${url.host}/api/spotify/playlists?t=${accessToken}`,
@@ -31,8 +33,14 @@ function useExport() {
       });
 
       dispatch({
-        type: Action.SET_EXPORT_LOADING,
-        pyaload: false,
+        type: Action.SET_CONTENT_TITLE,
+        payload: 'Download your music!',
+      });
+
+      dispatch({
+        type: Action.SET_CONTENT_SUBTITLE,
+        payload:
+          'Your music has been exported. Click the button below to download it.',
       });
     } catch (error) {
       console.error('Error fetching library export:', error);
@@ -49,34 +57,58 @@ function useExport() {
   }, []);
 
   const uploadFile = useCallback(async (filename: string) => {
-    const response = await fetch(
-      `https://${url.host}/api/upload?key=${encodeURIComponent(filename)}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'text/csv',
-        },
-        body: data,
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(
-        `Failed to upload file: (${response.status}) ${response.statusText}`
+    dispatch({
+      type: Action.SET_UPLOAD_LOADING,
+      payload: true,
+    });
+    try {
+      const response = await fetch(
+        `https://${url.host}/api/upload?key=${encodeURIComponent(filename)}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'text/csv',
+          },
+          body: data,
+        }
       );
+      if (!response.ok) {
+        dispatch({
+          type: Action.SET_UPLOAD_ERROR,
+          payload: new Error(
+            `Failed to upload file: (${response.status}) ${response.statusText}`
+          ),
+        });
+        return;
+      }
+
+      dispatch({
+        type: Action.SET_UPLOAD_COMPLETE,
+        payload: true,
+      });
+    } catch (e: AnyError) {
+      console.error('Error uploading file:', e);
+      dispatch({
+        type: Action.SET_UPLOAD_ERROR,
+        payload: e,
+      });
+    } finally {
+      dispatch({
+        type: Action.SET_UPLOAD_LOADING,
+        payload: false,
+      });
     }
-    console.log('File uploaded successfully');
   }, []);
 
   const downloadFile = useCallback(async () => {
-    // TODO: Use some UUID here.
-    const filename = `spotify-123.csv`;
-    await uploadFile(filename);
-
     dispatch({
       type: Action.SET_DOWNLOAD_LOADING,
       payload: true,
     });
+
+    const filename = `libx-export-${v4()}.csv`;
+    await uploadFile(filename);
+
     try {
       const response = await fetch(
         `https://${url.host}/api/download/${filename}`,
@@ -115,12 +147,13 @@ function useExport() {
         type: Action.SET_DOWNLOAD_LOADING,
         payload: false,
       });
+
+      window.location.href = '/';
     }
   }, []);
 
   const exportIsEmpty = () => {
-    // Download can still be "" if it fails
-    return !data;
+    return data === null;
   };
 
   const downloadIsEmpty = () => {
