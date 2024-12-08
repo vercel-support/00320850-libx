@@ -68,6 +68,7 @@ spotify = SpotifyOAuth(
     client_secret=spotify_client_secret,
     redirect_uri=spotify_redirect_uri,
     scope=spotify_scope,
+    cache_path=None,
 )
 
 boto = boto3.client(
@@ -94,23 +95,6 @@ def serve_arbitrary(path: str):
         return send_from_directory(app.static_folder, path)
     except:
         return send_from_directory(app.static_folder, "index.html")
-
-
-# @app.route("/api/upload", methods=["POST"])
-# @cross_origin(supports_credentials=True)
-# def upload_file():
-#     file_key = request.args.get("key")
-#     file_data = request.get_data(as_text=True)
-
-# boto.put_object(
-#     Bucket=r2_bucket_name,
-#     Key=file_key,
-#     Body=file_data,
-#     ContentType="text/csv",
-# )
-
-#     body = json.dumps({"message": "File uploaded successfully"})
-#     return Response(body, status=HTTPStatus.OK, mimetype="application/json")
 
 
 @app.route("/api/spotify/download/<filename>", methods=["GET"])
