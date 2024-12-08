@@ -1,18 +1,13 @@
 import { useEffect } from 'react';
-import {
-  Box,
-  Button,
-  Flex,
-  Heading,
-  Text,
-  Link,
-  Image,
-} from '@chakra-ui/react';
+import { Box, Button, Flex, Text, Spinner } from '@chakra-ui/react';
+import { useSearchParams } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { State, Action } from '../store';
 import BackgroundImg from '../components/BackgroundImg';
 import Content from '../components/Content';
 import SpotifyIcon from '../components/icons/SpotifyIcon';
+import MusicTapeIcon from '../components/icons/MusicTapeIcon';
+import { useDownload } from '../services/Download';
 
 const CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID;
 const REDIRECT_URI = import.meta.env.VITE_SPOTIFY_REDIRECT_URI;
@@ -21,59 +16,65 @@ const AUTH_URL = `https://accounts.spotify.com/authorize?response_type=token&cli
 
 function Index() {
   const dispatch = useDispatch();
+  const [searchParams] = useSearchParams();
+  const { downloadFile } = useDownload();
+  const accessToken = searchParams.get('t') as string;
 
-  const title = useSelector((state: State) => state.content.title);
   const subtitle = useSelector((state: State) => state.content.subtitle);
+  const loading = useSelector((state: State) => state.download.loading);
+
+  const onClick = () => {
+    if (!accessToken) {
+      window.location.href = AUTH_URL;
+    }
+    if (accessToken) {
+      downloadFile(accessToken);
+    }
+  };
+
+  const btnTitle = () => {
+    return accessToken ? 'Download' : 'Login';
+  };
 
   useEffect(() => {
     dispatch({
-      type: Action.SET_CONTENT_TITLE,
-      payload: 'Save your music!',
-    });
-
-    dispatch({
       type: Action.SET_CONTENT_SUBTITLE,
-      payload: 'libx allows you to export your entire Spotify library.',
+      payload: 'Download your Spotify library.',
     });
-  }, []);
+  }, [dispatch]);
 
   return (
     <BackgroundImg mediaURL="/assets/img/bg.webp">
       <Content>
-        <Flex w="100%" flexDirection="column" justifyContent="center">
-          <Heading as="h1" size="lg" mb={4} textAlign="center">
-            {title}
-          </Heading>
-          <Text textAlign="center" mb={4}>
+        <Flex w="80%" flexDirection="column" alignItems="center">
+          <MusicTapeIcon height="3em" width="3em" />
+          <Text textAlign="center" mb={4} mt={2}>
             {subtitle}
           </Text>
         </Flex>
-        <Flex flexDirection={['column']} w={'100%'}>
-          <Flex
-            flexDirection="column"
-            alignItems="center"
-            border="1px solid"
-            h={[200, 200]}
-            w={'100%'}
-            mb={2}
-          >
+        <Flex flexDirection={['column']} w={'80%'} alignItems={'center'}>
+          <Flex flexDirection="column" alignItems="center" w={'100%'} mb={2}>
             <Button
-              onClick={() => {
-                window.location.href = AUTH_URL;
-              }}
+              onClick={onClick}
               bg="black"
               color="white"
-              borderRadius="10px"
+              borderRadius={100}
               display="flex"
               alignItems="center"
               justifyContent="center"
               gap={2}
-              h="50px"
-              w={['150px', '200px']}
+              h={50}
+              w={[150, '100%']}
               _hover={{ bg: 'gray.700' }}
             >
-              <SpotifyIcon />
-              <Text>Spotify</Text>
+              {loading && <Spinner />}
+              {!loading && (
+                <>
+                  {' '}
+                  <SpotifyIcon />
+                  <Text>{btnTitle()}</Text>
+                </>
+              )}
             </Button>
           </Flex>
           <Flex
@@ -84,14 +85,14 @@ function Index() {
             mt={4}
           >
             <Box>
-              <Link href="https://www.buymeacoffee.com/rashad.wiki">
+              {/* <Link href="https://www.buymeacoffee.com/rashad.wiki">
                 <Image
                   src="https://img.buymeacoffee.com/button-api/?text=Buy me a coffee&emoji=&slug=rashad.wiki&button_colour=FFDD00&font_colour=000000&font_family=Lato&outline_colour=000000&coffee_colour=ffffff"
                   alt="Buy me a coffee"
-                  w={['150px', '150px']}
+                  w={['150', '150']}
                   _hover={{ opacity: 0.7 }}
                 />
-              </Link>
+              </Link> */}
             </Box>
           </Flex>
         </Flex>

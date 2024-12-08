@@ -72,7 +72,7 @@ const initialState = {
 };
 
 function libxReducer(
-  state = initialState,
+  state: State = initialState,
   action: { type: Action; payload?: any }
 ): State {
   switch (action.type) {
@@ -147,6 +147,5 @@ function libxReducer(
 }
 
 export default configureStore({
-  // @ts-ignore
   reducer: libxReducer,
 });

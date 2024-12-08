@@ -9,27 +9,25 @@ function ContentContainer({ children }: ContentContainerProps) {
   return (
     <>
       <Box
-        w={['90%', '450px']}
-        h="100%"
+        w={['90%', 450]}
+        h={['90%', 300]}
         bg="#075049"
         opacity="0.5"
         position="absolute"
-        borderRadius={['25px', '25px']}
+        borderRadius={[25, 75]}
         boxShadow="lg"
-        mt={['20%', '20%']}
       />
       <Flex
         flexDirection="column"
-        w={['90%', '450px']}
-        h="100%"
+        w={['90%', 450]}
+        h={['90%', 300]}
         alignItems="center"
         color="white"
         bg="transparent"
         position="relative"
-        borderRadius={['25px', '25px']}
+        borderRadius={25}
         p={4}
-        pt={['10px', '100px']}
-        mt={['20%', '20%']}
+        pt={[10, 50]}
       >
         {children}
       </Flex>

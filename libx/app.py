@@ -96,32 +96,60 @@ def serve_arbitrary(path: str):
         return send_from_directory(app.static_folder, "index.html")
 
 
-@app.route("/api/upload", methods=["POST"])
+# @app.route("/api/upload", methods=["POST"])
+# @cross_origin(supports_credentials=True)
+# def upload_file():
+#     file_key = request.args.get("key")
+#     file_data = request.get_data(as_text=True)
+
+# boto.put_object(
+#     Bucket=r2_bucket_name,
+#     Key=file_key,
+#     Body=file_data,
+#     ContentType="text/csv",
+# )
+
+#     body = json.dumps({"message": "File uploaded successfully"})
+#     return Response(body, status=HTTPStatus.OK, mimetype="application/json")
+
+
+@app.route("/api/spotify/download/<filename>", methods=["GET"])
 @cross_origin(supports_credentials=True)
-def upload_file():
-    file_key = request.args.get("key")
-    file_data = request.get_data(as_text=True)
-
-    boto.put_object(
-        Bucket=r2_bucket_name,
-        Key=file_key,
-        Body=file_data,
-        ContentType="text/csv",
-    )
-
-    body = json.dumps({"message": "File uploaded successfully"})
-    return Response(body, status=HTTPStatus.OK, mimetype="application/json")
-
-
-@app.route("/api/download/<filename>", methods=["GET"])
-@cross_origin(supports_credentials=True)
-def download_from_r2(filename: str):
+def download_spotify_library(filename: str):
     try:
-        response = boto.get_object(Bucket=r2_bucket_name, Key=filename)
-        file_content = response["Body"].read()
+        access_token = request.args.get("t")
+        if not access_token:
+            response = {
+                "error": "Unauthorized",
+                "message": "Session expired or invalid",
+            }
+            return app.response_class(
+                response=json.dumps(response),
+                status=HTTPStatus.UNAUTHORIZED,
+                mimetype="text/csv",
+            )
+
+        client = Spotify(auth=access_token)
+        playlists = SpotifyPlaylists.from_object(
+            client.current_user_playlists()
+        )
+        for playlist in playlists:
+            if playlist is not None:
+                playlist.tracks = Tracks.from_object(
+                    client.playlist_tracks(playlist.id)
+                )
+
+        content = playlists.to_csv()
+
+        boto.put_object(
+            Bucket=r2_bucket_name,
+            Key=filename,
+            Body=content,
+            ContentType="text/csv",
+        )
 
         return send_file(
-            BytesIO(file_content),
+            BytesIO(content.encode("utf-8")),
             as_attachment=True,
             download_name=filename,
             mimetype="text/csv",
@@ -146,38 +174,38 @@ def spotify_callback():
     session["token_info"] = token_info
     access_token = token_info["access_token"]
     domain = extract_domain(spotify_redirect_uri)
-    return redirect(f"{domain}/x?t={access_token}")
+    return redirect(f"{domain}/?t={access_token}")
 
 
-@app.route("/api/spotify/playlists")
-@cross_origin(supports_credentials=True)
-def get_playlists():
-    access_token = request.args.get("t")
-    if not access_token:
-        response = {
-            "error": "Unauthorized",
-            "message": "Session expired or invalid",
-        }
-        return app.response_class(
-            response=json.dumps(response),
-            status=HTTPStatus.UNAUTHORIZED,
-            mimetype="text/csv",
-        )
+# @app.route("/api/spotify/playlists")
+# @cross_origin(supports_credentials=True)
+# def get_playlists():
+#     access_token = request.args.get("t")
+#     if not access_token:
+#         response = {
+#             "error": "Unauthorized",
+#             "message": "Session expired or invalid",
+#         }
+#         return app.response_class(
+#             response=json.dumps(response),
+#             status=HTTPStatus.UNAUTHORIZED,
+#             mimetype="text/csv",
+#         )
 
-    client = Spotify(auth=access_token)
-    playlists = SpotifyPlaylists.from_object(client.current_user_playlists())
-    for playlist in playlists:
-        if playlist is not None:
-            playlist.tracks = Tracks.from_object(
-                client.playlist_tracks(playlist.id)
-            )
+#     client = Spotify(auth=access_token)
+#     playlists = SpotifyPlaylists.from_object(client.current_user_playlists())
+#     for playlist in playlists:
+#         if playlist is not None:
+#             playlist.tracks = Tracks.from_object(
+#                 client.playlist_tracks(playlist.id)
+#             )
 
-    return Response(
-        playlists.to_csv(),
-        status=HTTPStatus.OK,
-        mimetype="text/csv",
-        headers={"Content-Disposition": "attachment; filename=playlists.csv"},
-    )
+#     return Response(
+#         playlists.to_csv(),
+#         status=HTTPStatus.OK,
+#         mimetype="text/csv",
+#         headers={"Content-Disposition": "attachment; filename=playlists.csv"},
+#     )
 
 
 if __name__ == "__main__":

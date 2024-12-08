@@ -19,6 +19,7 @@ function BackgroundImg({ children, mediaURL }: BackgroundImgProps) {
       display="flex"
       justifyContent="center"
       alignItems="center"
+      p="fixed"
     >
       {children}
     </Box>
