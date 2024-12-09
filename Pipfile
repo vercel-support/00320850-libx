@@ -11,6 +11,7 @@ pytest = "*"
 boto3 = "*"
 flask = "*"
 flask-cors = "*"
+httpx = "*"
 python_dotenv = "*"
 
 [requires]
