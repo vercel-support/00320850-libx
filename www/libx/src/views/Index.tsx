@@ -1,6 +1,5 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Box, Button, Flex, Text, Spinner } from '@chakra-ui/react';
-import { useSearchParams } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { State, Action } from '../store';
 import BackgroundImg from '../components/BackgroundImg';
@@ -16,9 +15,8 @@ const AUTH_URL = `https://accounts.spotify.com/authorize?response_type=token&cli
 
 function Index() {
   const dispatch = useDispatch();
-  const [searchParams] = useSearchParams();
   const { downloadFile } = useDownload();
-  const accessToken = searchParams.get('t') as string;
+  const [accessToken, setAccessToken] = useState<string | null>(null);
 
   const subtitle = useSelector((state: State) => state.content.subtitle);
   const loading = useSelector((state: State) => state.download.loading);
@@ -32,7 +30,17 @@ function Index() {
     }
   };
 
+  useEffect(() => {
+    const fragment = window.location.hash.substring(1);
+    const params = new URLSearchParams(fragment);
+    const accessToken = params.get('access_token');
+
+    setAccessToken(accessToken);
+    console.log('accessToken', accessToken);
+  }, []);
+
   const btnTitle = () => {
+    console.log('> butn');
     return accessToken ? 'Download' : 'Login';
   };
 

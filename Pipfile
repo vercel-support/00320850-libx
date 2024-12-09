@@ -11,9 +11,7 @@ pytest = "*"
 boto3 = "*"
 flask = "*"
 flask-cors = "*"
-flask-session = "*"
 python_dotenv = "*"
-spotipy = "*"
 
 [requires]
 python_version = "3.12"
