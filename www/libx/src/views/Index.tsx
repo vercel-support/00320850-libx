@@ -36,11 +36,9 @@ function Index() {
     const accessToken = params.get('access_token');
 
     setAccessToken(accessToken);
-    console.log('accessToken', accessToken);
   }, []);
 
   const btnTitle = () => {
-    console.log('> butn');
     return accessToken ? 'Download' : 'Login';
   };
 

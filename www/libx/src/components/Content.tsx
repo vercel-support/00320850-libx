@@ -9,8 +9,8 @@ function ContentContainer({ children }: ContentContainerProps) {
   return (
     <>
       <Box
-        w={['90%', 450]}
-        h={['90%', 300]}
+        w={[350, 450]}
+        h={[250, 300]}
         bg="#075049"
         opacity="0.5"
         position="absolute"
@@ -19,8 +19,8 @@ function ContentContainer({ children }: ContentContainerProps) {
       />
       <Flex
         flexDirection="column"
-        w={['90%', 450]}
-        h={['90%', 300]}
+        w={[350, 450]}
+        h={[250, 300]}
         alignItems="center"
         color="white"
         bg="transparent"
