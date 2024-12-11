@@ -98,6 +98,40 @@ def get_spotify_playlists(access_token: str) -> list:
         raise
 
 
+def get_saved_tracks(access_token: str) -> list:
+    try:
+        headers = {"Authorization": f"Bearer {access_token}"}
+        saved_tracks = []
+        url = f"{spotify_api_base_url}/me/tracks"
+        while url:
+            response = httpx.get(url, headers=headers)
+            response.raise_for_status()
+            data = response.json()
+            saved_tracks.extend(data["items"])
+            url = data.get("next")
+        return saved_tracks
+    except Exception as e:
+        logger.error(f"Error fetching saved tracks: {e}")
+        raise
+
+
+def get_saved_albums(access_token: str) -> list:
+    try:
+        headers = {"Authorization": f"Bearer {access_token}"}
+        saved_albums = []
+        url = f"{spotify_api_base_url}/me/albums"
+        while url:
+            response = httpx.get(url, headers=headers)
+            response.raise_for_status()
+            data = response.json()
+            saved_albums.extend(data["items"])
+            url = data.get("next")
+        return saved_albums
+    except Exception as e:
+        logger.error(f"Error fetching saved albums: {e}")
+        raise
+
+
 def get_playlist_tracks(access_token: str, playlist_id: str) -> list:
     try:
         headers = {"Authorization": f"Bearer {access_token}"}
@@ -149,9 +183,10 @@ def download_spotify_library(filename: str):
         buff = io.StringIO()
         writer = csv.writer(buff)
         headers = [
-            "Playlist Name",
-            "Owner",
-            "Playlist URI",
+            "Type",
+            "Playlist Name / Album Name",
+            "Owner / Album Artist",
+            "Playlist URI / Album URI",
             "Track Name",
             "Artists",
             "Album",
@@ -163,13 +198,10 @@ def download_spotify_library(filename: str):
         for playlist in playlists:
             if not playlist:
                 continue
+
             playlist_name = playlist.get("name", "Unknown")
             owner = playlist.get("owner", {}).get("display_name", "Unknown")
             playlist_uri = playlist.get("uri", "Unknown")
-
-            tracks_href = playlist.get("tracks", {}).get("href")
-            if not tracks_href:
-                continue
 
             tracks = get_playlist_tracks(access_token, playlist["id"])
 
@@ -184,12 +216,65 @@ def download_spotify_library(filename: str):
 
                 writer.writerow(
                     [
+                        "Playlist",
                         playlist_name,
                         owner,
                         playlist_uri,
                         track_name,
                         artists,
                         album,
+                        track_uri,
+                    ]
+                )
+
+        saved_tracks = get_saved_tracks(access_token)
+        for track_item in saved_tracks:
+            track = track_item.get("track", {})
+            track_name = track.get("name", "Unknown")
+            artists = ", ".join(
+                artist["name"] for artist in track.get("artists", [])
+            )
+            album = track.get("album", {}).get("name", "Unknown")
+            track_uri = track.get("uri", "Unknown")
+
+            writer.writerow(
+                [
+                    "Saved Track",
+                    "",
+                    "",
+                    "",
+                    track_name,
+                    artists,
+                    album,
+                    track_uri,
+                ]
+            )
+
+        saved_albums = get_saved_albums(access_token)
+        for album_item in saved_albums:
+            album = album_item.get("album", {})
+            album_name = album.get("name", "Unknown")
+            album_artist = ", ".join(
+                artist["name"] for artist in album.get("artists", [])
+            )
+            album_uri = album.get("uri", "Unknown")
+
+            for track in album.get("tracks", {}).get("items", []):
+                track_name = track.get("name", "Unknown")
+                artists = ", ".join(
+                    artist["name"] for artist in track.get("artists", [])
+                )
+                track_uri = track.get("uri", "Unknown")
+
+                writer.writerow(
+                    [
+                        "Saved Album",
+                        album_name,
+                        album_artist,
+                        album_uri,
+                        track_name,
+                        artists,
+                        album_name,
                         track_uri,
                     ]
                 )

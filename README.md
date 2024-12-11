@@ -2,9 +2,11 @@
 
 A music library export tool.
 
+<img src="https://i.imgur.com/wI5WPCe.png" />
+
 ## Usage
 
-Check it out at [libx.stream](https://libx.stream).
+Check it out at [libx.stream](https://libx.stream)
 
 ## Dependencies
 
@@ -24,6 +26,5 @@ cd www/libx && watch -n 5 yarn build
 Run the Flask development server - which will serve the frontend.
 
 ```sh
-ENV=development FLASK_APP=libx/app.py FLASK_RUN_HOST=127.0.0.1 FLASK_RUN_PORT=5000 flask run
+ENV=development FLASK_APP=libx/app.py FLASK_RUN_HOST=127.0.0.1 FLASK_RUN_PORT=5000 flask run --reload
 ```
-
