@@ -23,6 +23,7 @@ function useDownload() {
             method: 'GET',
             headers: {
               'Content-Type': 'text/csv',
+              Connection: 'keep-alive',
             },
           }
         );
