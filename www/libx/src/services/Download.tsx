@@ -14,6 +14,11 @@ function useDownload() {
         payload: true,
       });
 
+      dispatch({
+        type: Action.SET_DOWNLOAD_ERROR,
+        payload: null,
+      });
+
       const filename = `libx-export-${v4()}.csv`;
 
       try {

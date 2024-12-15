@@ -21,6 +21,7 @@ function Index() {
 
   const subtitle = useSelector((state: State) => state.content.subtitle);
   const loading = useSelector((state: State) => state.download.loading);
+  const error = useSelector((state: State) => state.download.error);
   const downloadURI = useSelector((state: State) => state.download.downloadURI);
 
   const onClick = () => {
@@ -55,17 +56,17 @@ function Index() {
     if (loading) {
       toast('Downloading your library.', {
         autoClose: 10000,
-        progressStyle: {
-          backgroundColor: '#f88895',
-        },
       });
     }
 
     if (downloadURI) {
       toast('Download finished!', {
         autoClose: 10000,
-        progressStyle: { backgroundColor: '#f88895' },
       });
+    }
+
+    if (error) {
+      toast.error(`Failed to download library.`);
     }
   }, [loading, downloadURI]);
 
