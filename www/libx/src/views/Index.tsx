@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Box, Button, Flex, Text, Spinner } from '@chakra-ui/react';
 import { useSelector, useDispatch } from 'react-redux';
+import { toast } from 'react-toastify';
 import { State, Action } from '../store';
 import BackgroundImg from '../components/BackgroundImg';
 import Content from '../components/Content';
@@ -20,6 +21,7 @@ function Index() {
 
   const subtitle = useSelector((state: State) => state.content.subtitle);
   const loading = useSelector((state: State) => state.download.loading);
+  const downloadURI = useSelector((state: State) => state.download.downloadURI);
 
   const onClick = () => {
     if (!accessToken) {
@@ -48,6 +50,24 @@ function Index() {
       payload: 'Download your Spotify library.',
     });
   }, [dispatch]);
+
+  useEffect(() => {
+    if (loading) {
+      toast('Downloading your library.', {
+        autoClose: 10000,
+        progressStyle: {
+          backgroundColor: '#f88895',
+        },
+      });
+    }
+
+    if (downloadURI) {
+      toast('Download finished!', {
+        autoClose: 10000,
+        progressStyle: { backgroundColor: '#f88895' },
+      });
+    }
+  }, [loading, downloadURI]);
 
   return (
     <BackgroundImg mediaURL="/assets/img/bg.webp">

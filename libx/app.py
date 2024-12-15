@@ -1,14 +1,15 @@
 import os
 import sys
 import json
+import asyncio
 import csv
 import io
 import base64
 import logging
+from typing import *
 from io import BytesIO
 from dotenv import load_dotenv
 import boto3
-from typing import *
 from flask import (
     Flask,
     request,
@@ -30,7 +31,6 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
-
 
 spotify_client_id = os.environ["SPOTIFY_CLIENT_ID"]
 spotify_client_secret = os.environ["SPOTIFY_CLIENT_SECRET"]
@@ -59,16 +59,18 @@ boto = boto3.client(
 )
 
 
+def safeget(d: dict, key: str, default: Optional[Any] = None) -> Any:
+    return d[key] if isinstance(d, dict) and key in d else default
+
+
 def get_spotify_token(code: str) -> dict:
     spotify_token_url = "https://accounts.spotify.com/api/token"
     try:
-        client_credentials = f"{spotify_client_id}:{spotify_client_secret}"
-        encoded_credentials = base64.b64encode(
-            client_credentials.encode()
-        ).decode()
+        credentials = f"{spotify_client_id}:{spotify_client_secret}"
+        credentials = base64.b64encode(credentials.encode()).decode()
 
         headers = {
-            "Authorization": f"Basic {encoded_credentials}",
+            "Authorization": f"Basic {credentials}",
             "Content-Type": "application/x-www-form-urlencoded",
         }
         data = {
@@ -85,65 +87,71 @@ def get_spotify_token(code: str) -> dict:
         raise
 
 
-def get_spotify_playlists(access_token: str) -> list:
+async def fetch_url(client, url, headers):
     try:
-        headers = {"Authorization": f"Bearer {access_token}"}
-        response = httpx.get(
-            f"{spotify_api_base_url}/me/playlists", headers=headers
-        )
+        response = await client.get(url, headers=headers)
         response.raise_for_status()
-        return response.json()["items"]
+        return response.json()
     except Exception as e:
-        logger.error(f"Error fetching Spotify playlists: {e}")
-        raise
+        logger.error(f"Error fetching URL {url}: {e}")
+        return None
 
 
-def get_saved_tracks(access_token: str) -> list:
-    try:
+async def get_spotify_playlists(access_token: str) -> list:
+    async with httpx.AsyncClient() as client:
+        headers = {"Authorization": f"Bearer {access_token}"}
+        data = await fetch_url(
+            client,
+            f"{spotify_api_base_url}/me/playlists?fields=items(name,owner(display_name),uri,id)",
+            headers,
+        )
+        return data.get("items", []) if data else []
+
+
+async def get_saved_tracks(access_token: str) -> list:
+    async with httpx.AsyncClient() as client:
         headers = {"Authorization": f"Bearer {access_token}"}
         saved_tracks = []
         url = f"{spotify_api_base_url}/me/tracks"
         while url:
-            response = httpx.get(url, headers=headers)
-            response.raise_for_status()
-            data = response.json()
+            data = await fetch_url(client, url, headers)
+            if not data:
+                break
             saved_tracks.extend(data["items"])
             url = data.get("next")
         return saved_tracks
-    except Exception as e:
-        logger.error(f"Error fetching saved tracks: {e}")
-        raise
 
 
-def get_saved_albums(access_token: str) -> list:
-    try:
+async def get_saved_albums(access_token: str) -> list:
+    async with httpx.AsyncClient() as client:
         headers = {"Authorization": f"Bearer {access_token}"}
         saved_albums = []
         url = f"{spotify_api_base_url}/me/albums"
         while url:
-            response = httpx.get(url, headers=headers)
-            response.raise_for_status()
-            data = response.json()
+            data = await fetch_url(client, url, headers)
+            if not data:
+                break
             saved_albums.extend(data["items"])
             url = data.get("next")
         return saved_albums
-    except Exception as e:
-        logger.error(f"Error fetching saved albums: {e}")
-        raise
 
 
-def get_playlist_tracks(access_token: str, playlist_id: str) -> list:
+async def get_playlist_tracks(access_token: str, playlist_id: str) -> list:
     try:
-        headers = {"Authorization": f"Bearer {access_token}"}
-        response = httpx.get(
-            f"{spotify_api_base_url}/playlists/{playlist_id}/tracks",
-            headers=headers,
-        )
-        response.raise_for_status()
-        return response.json()["items"]
+        async with httpx.AsyncClient() as client:
+            headers = {"Authorization": f"Bearer {access_token}"}
+            url = f"{spotify_api_base_url}/playlists/{playlist_id}/tracks"
+            tracks = []
+            while url:
+                response = await client.get(url, headers=headers)
+                response.raise_for_status()
+                data = response.json()
+                tracks.extend(data.get("items", []))
+                url = data.get("next")
+            return tracks
     except Exception as e:
-        logger.error(f"Error fetching playlist tracks: {e}")
-        raise
+        logger.error(f"Error fetching playlist tracks for {playlist_id}: {e}")
+        return []
 
 
 @app.route("/")
@@ -164,6 +172,34 @@ def serve_arbitrary(path: str):
         return send_from_directory(app.static_folder, "index.html")
 
 
+async def fetch_playlists_and_tracks(access_token: str):
+    try:
+        playlists = await get_spotify_playlists(access_token)
+
+        async def fetch_tracks(playlist):
+            playlist_id = playlist.get("id")
+            list_tracks = await get_playlist_tracks(access_token, playlist_id)
+            return playlist, list_tracks
+
+        results = await asyncio.gather(
+            *(fetch_tracks(playlist) for playlist in playlists),
+            return_exceptions=True,
+        )
+
+        playlist_tracks = []
+        for result in results:
+            if isinstance(result, Exception):
+                logger.error(f"Error fetching tracks: {result}")
+                continue
+            playlist, tracks = result
+            playlist_tracks.append((playlist, tracks))
+        return playlist_tracks
+
+    except Exception as e:
+        logger.error(f"Error fetching playlists and tracks: {e}")
+        return []
+
+
 @app.route("/api/spotify/download/<filename>", methods=["GET"])
 @cross_origin(supports_credentials=True)
 def download_spotify_library(filename: str):
@@ -180,46 +216,98 @@ def download_spotify_library(filename: str):
                 mimetype="application/json",
             )
 
-        buff = io.StringIO()
-        writer = csv.writer(buff)
-        headers = [
-            "Type",
-            "Playlist Name / Album Name",
-            "Owner / Album Artist",
-            "Playlist URI / Album URI",
-            "Track Name",
-            "Artists",
-            "Album",
-            "Track URI",
-        ]
-        writer.writerow(headers)
+        async def process_and_upload():
 
-        playlists = get_spotify_playlists(access_token)
-        for playlist in playlists:
-            if not playlist:
-                continue
+            async def gather_data():
+                pt = await fetch_playlists_and_tracks(access_token)
+                t = await get_saved_tracks(access_token)
+                a = await get_saved_albums(access_token)
+                return pt, t, a
 
-            playlist_name = playlist.get("name", "Unknown")
-            owner = playlist.get("owner", {}).get("display_name", "Unknown")
-            playlist_uri = playlist.get("uri", "Unknown")
+            playlists_and_tracks, saved_tracks, saved_albums = (
+                await gather_data()
+            )
 
-            tracks = get_playlist_tracks(access_token, playlist["id"])
+            buff = io.StringIO()
+            writer = csv.writer(buff)
+            headers = [
+                "Type",
+                "Playlist Name / Album Name",
+                "Owner / Album Artist",
+                "Playlist URI / Album URI",
+                "Track Name",
+                "Artists",
+                "Album",
+                "Track URI",
+            ]
 
-            for track_item in tracks:
-                track = track_item.get("track", {})
-                track_name = track.get("name", "Unknown")
-                artists = ", ".join(
-                    artist["name"] for artist in track.get("artists", [])
+            rows = []
+
+            for playlist, tracklist in playlists_and_tracks:
+                if not playlist or not tracklist:
+                    continue
+
+                playlist_name = safeget(playlist, "name", "Unknown")
+                owner = safeget(
+                    safeget(playlist, "owner", {}), "display_name", "Unknown"
                 )
-                album = track.get("album", {}).get("name", "Unknown")
-                track_uri = track.get("uri", "Unknown")
+                playlist_uri = safeget(playlist, "uri", "Unknown")
 
-                writer.writerow(
+                for track_item in tracklist:
+                    if not track_item:
+                        continue
+                    track = safeget(track_item, "track", {})
+                    track_name = safeget(track, "name", "Unknown")
+                    artists = "+ ".join(
+                        filter(
+                            None,
+                            (
+                                safeget(artist, "name")
+                                for artist in safeget(track, "artists", [])
+                            ),
+                        )
+                    )
+                    album = safeget(
+                        safeget(track, "album", {}), "name", "Unknown"
+                    )
+                    track_uri = safeget(track, "uri", "Unknown")
+
+                    rows.append(
+                        [
+                            "Playlist",
+                            playlist_name,
+                            owner,
+                            playlist_uri,
+                            track_name,
+                            artists,
+                            album,
+                            track_uri,
+                        ]
+                    )
+
+            for track_item in saved_tracks:
+                if not track_item:
+                    continue
+                track = safeget(track_item, "track", {})
+                track_name = safeget(track, "name", "Unknown")
+                artists = "+ ".join(
+                    filter(
+                        None,
+                        (
+                            safeget(artist, "name")
+                            for artist in safeget(track, "artists", [])
+                        ),
+                    )
+                )
+                album = safeget(safeget(track, "album", {}), "name", "Unknown")
+                track_uri = safeget(track, "uri", "Unknown")
+
+                rows.append(
                     [
-                        "Playlist",
-                        playlist_name,
-                        owner,
-                        playlist_uri,
+                        "Saved Track",
+                        "",
+                        "",
+                        "",
                         track_name,
                         artists,
                         album,
@@ -227,66 +315,65 @@ def download_spotify_library(filename: str):
                     ]
                 )
 
-        saved_tracks = get_saved_tracks(access_token)
-        for track_item in saved_tracks:
-            track = track_item.get("track", {})
-            track_name = track.get("name", "Unknown")
-            artists = ", ".join(
-                artist["name"] for artist in track.get("artists", [])
-            )
-            album = track.get("album", {}).get("name", "Unknown")
-            track_uri = track.get("uri", "Unknown")
-
-            writer.writerow(
-                [
-                    "Saved Track",
-                    "",
-                    "",
-                    "",
-                    track_name,
-                    artists,
-                    album,
-                    track_uri,
-                ]
-            )
-
-        saved_albums = get_saved_albums(access_token)
-        for album_item in saved_albums:
-            album = album_item.get("album", {})
-            album_name = album.get("name", "Unknown")
-            album_artist = ", ".join(
-                artist["name"] for artist in album.get("artists", [])
-            )
-            album_uri = album.get("uri", "Unknown")
-
-            for track in album.get("tracks", {}).get("items", []):
-                track_name = track.get("name", "Unknown")
-                artists = ", ".join(
-                    artist["name"] for artist in track.get("artists", [])
+            for album_item in saved_albums:
+                if not album_item:
+                    continue
+                album = safeget(album_item, "album", {})
+                album_name = safeget(album, "name", "Unknown")
+                album_artist = "+ ".join(
+                    filter(
+                        None,
+                        (
+                            safeget(artist, "name")
+                            for artist in safeget(album, "artists", [])
+                        ),
+                    )
                 )
-                track_uri = track.get("uri", "Unknown")
+                album_uri = safeget(album, "uri", "Unknown")
 
-                writer.writerow(
-                    [
-                        "Saved Album",
-                        album_name,
-                        album_artist,
-                        album_uri,
-                        track_name,
-                        artists,
-                        album_name,
-                        track_uri,
-                    ]
-                )
+                for track in safeget(safeget(album, "tracks", {}), "items", []):
+                    if not track:
+                        continue
 
-        content = buff.getvalue()
+                    track_name = safeget(track, "name", "Unknown")
+                    artists = "+ ".join(
+                        filter(
+                            None,
+                            (
+                                safeget(artist, "name")
+                                for artist in safeget(track, "artists", [])
+                            ),
+                        )
+                    )
+                    track_uri = safeget(track, "uri", "Unknown")
 
-        boto.put_object(
-            Bucket=r2_bucket_name,
-            Key=filename,
-            Body=content,
-            ContentType="text/csv",
-        )
+                    rows.append(
+                        [
+                            "Saved Album",
+                            album_name,
+                            album_artist,
+                            album_uri,
+                            track_name,
+                            artists,
+                            album_name,
+                            track_uri,
+                        ]
+                    )
+
+            writer.writerow(headers)
+            writer.writerows(rows)
+            data = buff.getvalue()
+
+            boto.put_object(
+                Bucket=r2_bucket_name,
+                Key=filename,
+                Body=data,
+                ContentType="text/csv",
+            )
+
+            return data
+
+        content = asyncio.run(process_and_upload())
 
         return send_file(
             BytesIO(content.encode("utf-8")),

@@ -61,7 +61,9 @@ function useDownload() {
           payload: false,
         });
 
-        window.location.href = '/';
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 10000);
       }
     },
     [dispatch, url.host]
