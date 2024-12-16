@@ -1,36 +1,25 @@
 {
-  "builds": [
-    {
-      "src": "www/libx/package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "installCommand": "yarn install",
-        "buildCommand": "yarn build",
-        "outputDirectory": "www/libx/dist"
-      }
-    },
-    {
-      "src": "libx/app.py",
-      "use": "@vercel/python",
-      "config": {
-        "runtime": "python3.12",
-        "installCommand": "pip install pipenv && pipenv install --deploy",
-        "startCommand": "ENV=production FLASK_APP=libx/app.py FLASK_RUN_HOST=0.0.0.0 FLASK_RUN_PORT=5000 flask run"
-      }
+  "functions": {
+    "api/app.py": {
+      "memory": 1024,
+      "maxDuration": 30,
+      "includeFiles": "api/**"
     }
-  ],
-  "routes": [
+  },
+  "buildCommand": "pip install pipenv && pipenv install --deploy && yarn --cwd www/libx install && yarn --cwd www/libx build",
+  "outputDirectory": "www/libx/dist",
+  "rewrites": [
     {
-      "src": "/api/(.*)",
-      "dest": "/libx/app.py"
+      "source": "/api/(.*)",
+      "destination": "/api/app.py"
     },
     {
-      "src": "/static/(.*)",
-      "dest": "/www/libx/dist/$1"
+      "source": "/static/(.*)",
+      "destination": "/www/libx/dist/$1"
     },
     {
-      "src": "/(.*)",
-      "dest": "/libx/app.py"
+      "source": "/(.*)",
+      "destination": "/api/app.py"
     }
   ]
 }
