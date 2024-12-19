@@ -3,10 +3,10 @@
     "api/app.py": {
       "memory": 1024,
       "maxDuration": 30,
-      "includeFiles": "api/**"
+      "includeFiles": "api/**/*"
     }
   },
-  "buildCommand": "pip install pipenv && pipenv install --deploy && yarn --cwd www/libx install && yarn --cwd www/libx build",
+  "buildCommand": "yarn --cwd www/libx install && yarn --cwd www/libx build",
   "outputDirectory": "www/libx/dist",
   "rewrites": [
     {

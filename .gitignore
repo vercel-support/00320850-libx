@@ -4,3 +4,4 @@ venv/
 *.env
 flask_session/
 .idea/
+.vercel
