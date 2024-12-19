@@ -7,14 +7,14 @@
     }
   },
   "buildCommand": "yarn --cwd www/libx install && yarn --cwd www/libx build",
-  "outputDirectory": "www/libx/dist",
+  "outputDirectory": ".",
   "rewrites": [
     {
       "source": "/api/(.*)",
       "destination": "/api/app.py"
     },
     {
-      "source": "/static/(.*)",
+      "source": "/(.*)",
       "destination": "/www/libx/dist/$1"
     },
     {
