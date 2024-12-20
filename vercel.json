@@ -6,20 +6,10 @@
       "includeFiles": "api/**/*"
     }
   },
-  "buildCommand": "yarn --cwd www/libx install && yarn --cwd www/libx build",
-  "outputDirectory": ".",
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/api/app.py"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/www/libx/dist/$1"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/api/app.py"
+      "destination": "/api/$1"
     }
   ]
 }
