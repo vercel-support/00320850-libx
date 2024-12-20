@@ -6,5 +6,7 @@
       "includeFiles": "api/**/*"
     }
   },
+  "buildCommand": "yarn --cwd www/libx install && yarn --cwd www/libx build",
+  "outputDirectory": "www/libx/dist",
   "rewrites": [{ "source": "/api/(.*)", "destination": "/api/app" }]
 }
