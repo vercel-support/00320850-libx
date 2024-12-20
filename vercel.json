@@ -6,10 +6,5 @@
       "includeFiles": "api/**/*"
     }
   },
-  "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/api/app"
-    }
-  ]
+  "rewrites": [{ "source": "/api/(.*)", "destination": "/api/app" }]
 }
